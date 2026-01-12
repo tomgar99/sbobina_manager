@@ -33,6 +33,18 @@ if 'shifts' not in st.session_state:
 if 'supervision_subjects' not in st.session_state:
     st.session_state.supervision_subjects = []
 
+# --- DB CONNECTION CHECK ---
+sb_status = DataManager._get_supabase()
+if not sb_status:
+    st.warning("⚠️ ATTENZIONE: Database non connesso! Assicurati di aver impostato i Secrets su Streamlit Cloud.")
+    # Debug info
+    if "SUPABASE_URL" not in st.secrets:
+         st.error("Secret 'SUPABASE_URL' mancante.")
+    try:
+        from supabase import create_client
+    except ImportError:
+        st.error("Libreria 'supabase' non installata corretamente.")
+
 st.set_page_config(page_title="Sbobina Manager", layout="wide", page_icon="📱")
 
 # --- CUSTOM CSS FOR MOBILE UX & HIDING TOOLBAR ---
