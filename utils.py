@@ -57,6 +57,24 @@ class DataManager:
             return []
 
     @staticmethod
+    def delete_user(user: User):
+        sb = DataManager._get_supabase()
+        if sb:
+            try:
+                # Delete specific user by email
+                sb.table("users").delete().eq("email", user.email).execute()
+            except Exception as e:
+                st.error(f"Errore eliminazione Supabase: {e}")
+        else:
+            # For local JSON, saving the list without the user is enough, 
+            # so this method effectively just needs to ensure the user is removed from any list before saving.
+            # However, since the app manages state, we assume the user is removed from state 
+            # and then save_users is called. 
+            # BUT, for consistency, we update the file here if we want immediate effect without full save,
+            # or we rely on save_users overwriting the file.
+            pass
+
+    @staticmethod
     def save_users(users: List[User]):
         sb = DataManager._get_supabase()
         if sb:

@@ -27,9 +27,13 @@ if 'supervision_subjects' not in st.session_state:
 
 st.set_page_config(page_title="Sbobina Manager", layout="wide", page_icon="📱")
 
-# --- CUSTOM CSS FOR MOBILE UX ---
+# --- CUSTOM CSS FOR MOBILE UX & HIDING TOOLBAR ---
 st.markdown("""
 <style>
+    [data-testid="stToolbar"] {
+        visibility: hidden;
+        height: 0px;
+    }
     .shift-card {
         background-color: #f0f2f6;
         border-radius: 10px;
@@ -186,10 +190,11 @@ else:
         with ad_tab2:
             st.subheader("Gestione Utenti Avanzata")
             
-            tab_list, tab_edit = st.tabs(["Lista Utenti", "Modifica Utente"])
+            tab_list, tab_edit, tab_create = st.tabs(["Lista Utenti", "Modifica Utente", "➕ Crea Nuovo Utente"])
             
             with tab_list:
-                st.dataframe(pd.DataFrame([{"Nome": u.name, "Email": u.email, "Ruolo": u.role} for u in st.session_state.users]), use_container_width=True)
+                # Added Password to the view as requested
+                st.dataframe(pd.DataFrame([{"Nome": u.name, "Email": u.email, "Ruolo": u.role, "Password": u.password} for u in st.session_state.users]), use_container_width=True)
                 
             with tab_edit:
                 user_to_edit_name = st.selectbox("Seleziona Utente da Modificare", [u.name for u in st.session_state.users])
@@ -201,6 +206,7 @@ else:
                         # ... (keep existing edit form logic)
                         new_role = st.selectbox("Ruolo", ["Sbobinatore", "Revisore", "Admin"], index=["Sbobinatore", "Revisore", "Admin"].index(user_to_edit.role))
                         new_email = st.text_input("Email", user_to_edit.email)
+                        new_password = st.text_input("Password", user_to_edit.password) # Added password edit
                         new_phone = st.text_input("Telefono", user_to_edit.phone)
                         
                         st.write("---")
@@ -217,9 +223,14 @@ else:
                             st.warning("Carica calendario per vedere materie")
                             new_blacklist = user_to_edit.blacklist_subjects
                         
-                        if st.form_submit_button("Salva Modifiche"):
+                        col_save, col_del = st.columns([4, 1])
+                        
+                        saved = col_save.form_submit_button("💾 Salva Modifiche")
+                        
+                        if saved:
                             user_to_edit.role = new_role
                             user_to_edit.email = new_email
+                            user_to_edit.password = new_password
                             user_to_edit.phone = new_phone
                             for d in dates_to_remove: 
                                 if d in user_to_edit.unavailable_dates: user_to_edit.unavailable_dates.remove(d)
@@ -228,6 +239,44 @@ else:
                             DataManager.save_users(st.session_state.users)
                             st.success(f"Utente {user_to_edit.name} aggiornato!")
                             st.rerun()
+
+                    # Delete button outside the form to avoid submission conflicts or accidental submits
+                    st.write("---")
+                    with st.expander("🗑️ Zona Pericolo: Elimina Utente"):
+                        st.warning(f"Stai per eliminare definitivamente {user_to_edit.name}.")
+                        if st.button("Conferma Eliminazione Utente", type="primary"):
+                            try:
+                                # Remove from Session State
+                                st.session_state.users.remove(user_to_edit)
+                                # Remove from DB
+                                DataManager.delete_user(user_to_edit)
+                                # Save state (this helps sync JSON fallback if used, though delete_user handles Supabase separately)
+                                DataManager.save_users(st.session_state.users)
+                                st.success("Utente eliminato.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Errore: {e}")
+
+            with tab_create:
+                st.subheader("Crea Nuovo Utente (Admin)")
+                with st.form("admin_create_user"):
+                    c_name = st.text_input("Nome e Cognome")
+                    c_email = st.text_input("Email")
+                    c_phone = st.text_input("Telefono")
+                    c_role = st.selectbox("Ruolo", ["Sbobinatore", "Revisore", "Admin"])
+                    c_pass = st.text_input("Password", value="1234")
+                    
+                    if st.form_submit_button("Crea Utente"):
+                        if any(u.email == c_email for u in st.session_state.users):
+                            st.error("Esiste già un utente con questa email.")
+                        elif c_name and c_email:
+                            new_u = User(c_name, c_email, c_phone, c_role, password=c_pass)
+                            st.session_state.users.append(new_u)
+                            DataManager.save_users(st.session_state.users)
+                            st.success(f"Utente {c_name} creato con successo!")
+                            st.rerun()
+                        else:
+                            st.warning("Compila almeno Nome ed Email.")
 
         with ad_tab3:
             st.subheader("🗓️ Calendario Pubblico Completo")
