@@ -34,6 +34,15 @@ st.markdown("""
         visibility: hidden;
         height: 0px;
     }
+    footer {
+        visibility: hidden;
+    }
+    #MainMenu {
+        visibility: hidden;
+    }
+    header {
+        visibility: hidden;
+    }
     .shift-card {
         background-color: #f0f2f6;
         border-radius: 10px;
