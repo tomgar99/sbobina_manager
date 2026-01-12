@@ -22,6 +22,14 @@ if 'lessons' not in st.session_state:
     st.session_state.lessons = []
 if 'shifts' not in st.session_state:
     st.session_state.shifts = []
+    # Try loading from DB
+    loaded = DataManager.load_shifts(st.session_state.users)
+    if loaded:
+        st.session_state.shifts = loaded
+        # Also reconstruct lessons from shifts if empty
+        if 'lessons' not in st.session_state or not st.session_state.lessons:
+             st.session_state.lessons = [s.lesson for s in loaded]
+
 if 'supervision_subjects' not in st.session_state:
     st.session_state.supervision_subjects = []
 
@@ -168,7 +176,8 @@ else:
                             st.session_state.get('excluded_subjects', [])
                         )
                         st.session_state.shifts = optimizer.generate_shifts(st.session_state.lessons)
-                        st.success("Turni generati con successo!")
+                        DataManager.save_shifts(st.session_state.shifts)
+                        st.success("Turni generati e SALVATI nel database!")
             
             with col2:
                 st.subheader("2. Anteprima")

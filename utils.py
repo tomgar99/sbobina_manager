@@ -96,6 +96,39 @@ class DataManager:
             except Exception as e:
                 print(f"Error saving users: {e}")
 
+    @staticmethod
+    def load_shifts(all_users: List[User]) -> List[Shift]:
+        sb = DataManager._get_supabase()
+        if sb:
+            try:
+                response = sb.table("shifts").select("*").execute()
+                shifts_data = response.data
+                return [Shift.from_dict(s, all_users) for s in shifts_data]
+            except Exception as e:
+                # If table doesn't exist or empty
+                print(f"Info loading shifts: {e}")
+                return []
+        return []
+
+    @staticmethod
+    def save_shifts(shifts: List[Shift]):
+        sb = DataManager._get_supabase()
+        if sb:
+            try:
+                # We want to replace the current schedule with the new one.
+                # Simplest strategy: Delete * (all rows) then Insert new.
+                # Warning: ensuring we don't lose history if we want it, but user asked for "save state".
+                
+                # Delete all
+                sb.table("shifts").delete().neq("id", 0).execute() # Hack to delete all since id != 0
+                
+                # Insert new
+                if shifts:
+                    data = [s.to_dict() for s in shifts]
+                    sb.table("shifts").insert(data).execute()
+            except Exception as e:
+                st.error(f"Errore salvataggio Turni: {e}")
+
 def parse_excel_schedule(file) -> List[Lesson]:
     try:
         df = pd.read_excel(file, header=None)

@@ -57,8 +57,49 @@ class Lesson:
     def key(self):
         return f"{self.date}_{self.subject}"
 
+    def to_dict(self):
+        return {
+            "date": self.date.isoformat(),
+            "subject": self.subject,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "location": self.location,
+            "duration_hours": self.duration_hours,
+            "is_supervision": self.is_supervision
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            date=date.fromisoformat(data["date"]),
+            subject=data["subject"],
+            start_time=data["start_time"],
+            end_time=data["end_time"],
+            location=data["location"],
+            duration_hours=data["duration_hours"],
+            is_supervision=data.get("is_supervision", False)
+        )
+
 @dataclass
 class Shift:
     lesson: Lesson
     sbobinatori: List[User]
     revisori: List[User]
+
+    def to_dict(self):
+        return {
+            "lesson": self.lesson.to_dict(),
+            "sbobinatori_emails": [u.email for u in self.sbobinatori],
+            "revisori_emails": [u.email for u in self.revisori]
+        }
+
+    @classmethod
+    def from_dict(cls, data, all_users: List[User]):
+        # Reconstruct users from emails
+        sbob = [u for u in all_users if u.email in data["sbobinatori_emails"]]
+        rev = [u for u in all_users if u.email in data["revisori_emails"]]
+        return cls(
+            lesson=Lesson.from_dict(data["lesson"]),
+            sbobinatori=sbob,
+            revisori=rev
+        )
