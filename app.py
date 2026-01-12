@@ -136,74 +136,164 @@ else:
         ad_tab1, ad_tab2, ad_tab3 = st.tabs(["⚡ Gestione Turni", "👥 Gestione Utenti", "🗓️ Calendario Pubblico"])
         
         with ad_tab1:
-            col1, col2 = st.columns([1, 2])
+            # Sub-tabs for Shifts
+            shift_mode = st.radio("Modalità", ["🪄 Generatore Automatico", "🛠️ Editor Manuale"], horizontal=True)
             
-            with col1:
-                st.subheader("1. Carica Calendario")
-                uploaded_file = st.file_uploader("Upload Excel Calendario", type=["xlsx"])
-                if uploaded_file and st.button("Analizza File"):
-                    st.session_state.lessons = parse_excel_schedule(uploaded_file)
-                    st.success(f"Trovate {len(st.session_state.lessons)} lezioni!")
-                    
-                st.subheader("3. Configura Materie")
-                if st.session_state.lessons:
-                    all_subjects = sorted(list(set(l.subject for l in st.session_state.lessons)))
-                    
-                    c1_sub, c2_sub = st.columns(2)
-                    with c1_sub:
-                        st.session_state.supervision_subjects = st.multiselect(
-                            "Materie 'Supervisione'", 
-                            options=all_subjects,
-                            default=st.session_state.supervision_subjects
-                        )
-                    with c2_sub:
-                        if 'excluded_subjects' not in st.session_state:
-                            st.session_state.excluded_subjects = []
-                        st.session_state.excluded_subjects = st.multiselect(
-                            "Materie ESCLUSE", 
-                            options=all_subjects,
-                            default=st.session_state.excluded_subjects
-                        )
-                    
-                st.subheader("4. Generazione")
-                if st.button("Genera Turni 🎲"):
-                    if not st.session_state.lessons:
-                        st.error("Prima carica un calendario!")
+            if shift_mode == "🪄 Generatore Automatico":
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.subheader("1. Carica Calendario")
+                    uploaded_file = st.file_uploader("Upload Excel Calendario", type=["xlsx"])
+                    if uploaded_file and st.button("Analizza File"):
+                        st.session_state.lessons = parse_excel_schedule(uploaded_file)
+                        st.success(f"Trovate {len(st.session_state.lessons)} lezioni!")
+                        
+                    st.subheader("3. Configura Materie")
+                    if st.session_state.lessons:
+                        all_subjects = sorted(list(set(l.subject for l in st.session_state.lessons)))
+                        
+                        c1_sub, c2_sub = st.columns(2)
+                        with c1_sub:
+                            st.session_state.supervision_subjects = st.multiselect(
+                                "Materie 'Supervisione'", 
+                                options=all_subjects,
+                                default=st.session_state.supervision_subjects
+                            )
+                        with c2_sub:
+                            if 'excluded_subjects' not in st.session_state:
+                                st.session_state.excluded_subjects = []
+                            st.session_state.excluded_subjects = st.multiselect(
+                                "Materie ESCLUSE", 
+                                options=all_subjects,
+                                default=st.session_state.excluded_subjects
+                            )
+                        
+                    st.subheader("4. Generazione")
+                    if st.button("Genera Turni 🎲"):
+                        if not st.session_state.lessons:
+                            st.error("Prima carica un calendario!")
+                        else:
+                            optimizer = ShiftOptimizer(
+                                st.session_state.users, 
+                                st.session_state.supervision_subjects,
+                                st.session_state.get('excluded_subjects', [])
+                            )
+                            st.session_state.shifts = optimizer.generate_shifts(st.session_state.lessons)
+                            if DataManager.save_shifts(st.session_state.shifts):
+                                st.success("Turni generati e SALVATI nel database!")
+                            else:
+                                st.error("Errore nel salvataggio!")
+                
+                with col2:
+                    st.subheader("2. Anteprima")
+                    if st.session_state.shifts:
+                        st.write("### Turni Generati")
+                        data = []
+                        for s in st.session_state.shifts:
+                            sbob_names = ", ".join([u.name for u in s.sbobinatori])
+                            rev_names = ", ".join([u.name for u in s.revisori])
+                            data.append({
+                                "Date": s.lesson.date.strftime('%d/%m/%Y'),
+                                "Materia": s.lesson.subject,
+                                "Orario": f"{s.lesson.start_time}-{s.lesson.end_time}",
+                                "Sbobinatori": sbob_names,
+                                "Revisori": rev_names
+                            })
+                        st.dataframe(pd.DataFrame(data), use_container_width=True)
+                        
+                    elif st.session_state.lessons:
+                        st.write("### Lezioni Caricate")
+                        df_lessons = pd.DataFrame([vars(l) for l in st.session_state.lessons])
+                        st.dataframe(df_lessons, use_container_width=True)
                     else:
-                        optimizer = ShiftOptimizer(
-                            st.session_state.users, 
-                            st.session_state.supervision_subjects,
-                            st.session_state.get('excluded_subjects', [])
-                        )
-                        st.session_state.shifts = optimizer.generate_shifts(st.session_state.lessons)
-                        DataManager.save_shifts(st.session_state.shifts)
-                        st.success("Turni generati e SALVATI nel database!")
+                        st.info("Attesa file...")
             
-            with col2:
-                st.subheader("2. Anteprima")
-                if st.session_state.shifts:
-                    st.write("### Turni Generati")
-                    # ... shift table logic moved to separate function or kept here
-                    data = []
-                    for s in st.session_state.shifts:
-                        sbob_names = ", ".join([u.name for u in s.sbobinatori])
-                        rev_names = ", ".join([u.name for u in s.revisori])
-                        data.append({
-                            "Date": s.lesson.date,
-                            "Time": s.lesson.start_time,
-                            "Subject": s.lesson.subject,
-                            "Type": "Sup" if s.lesson.is_supervision else "Std",
-                            "Sbobinatori": sbob_names,
-                            "Revisori": rev_names
-                        })
-                    st.dataframe(pd.DataFrame(data), use_container_width=True)
-                    
-                elif st.session_state.lessons:
-                    st.write("### Lezioni Caricate")
-                    df_lessons = pd.DataFrame([vars(l) for l in st.session_state.lessons])
-                    st.dataframe(df_lessons, use_container_width=True)
-                else:
-                    st.info("Attesa file...")
+            else:
+                # === MANUAL EDITOR ===
+                st.subheader("🛠️ Gestione Manuale Turni")
+                
+                c_edit, c_add = st.columns([2, 1])
+                
+                with c_add:
+                    st.markdown("### ➕ Aggiungi Nuovo Turno")
+                    with st.form("add_shift_form"):
+                        new_date = st.date_input("Data", date.today())
+                        new_subj = st.text_input("Materia")
+                        new_start = st.text_input("Ora Inizio", "09:00")
+                        new_end = st.text_input("Ora Fine", "11:00")
+                        
+                        if st.form_submit_button("Aggiungi Turno"):
+                            if new_subj:
+                                # Create Lesson
+                                l = Lesson(new_date, new_subj, new_start, new_end, "", 2.0)
+                                s = Shift(l, [], [])
+                                st.session_state.shifts.append(s)
+                                DataManager.save_shifts(st.session_state.shifts)
+                                st.success("Turno Aggiunto!")
+                                st.rerun()
+                            else:
+                                st.warning("Compila materia")
+
+                with c_edit:
+                    st.markdown("### ✏️ Modifica Esistente")
+                    if st.session_state.shifts:
+                        # Sort for easier finding
+                        shifts_list = sorted(st.session_state.shifts, key=lambda x: (x.lesson.date, x.lesson.start_time))
+                        # Create labels
+                        shift_options = {f"{s.lesson.date.strftime('%d/%m/%Y')} - {s.lesson.subject}": s for s in shifts_list}
+                        
+                        selected_label = st.selectbox("Seleziona Turno", list(shift_options.keys()))
+                        if selected_label:
+                            target_shift = shift_options[selected_label]
+                            
+                            with st.form("edit_shift_manual"):
+                                c1, c2 = st.columns(2)
+                                with c1:
+                                    e_date = st.date_input("Data", target_shift.lesson.date)
+                                    e_subj = st.text_input("Materia", target_shift.lesson.subject)
+                                with c2:
+                                    e_start = st.text_input("Inizio", target_shift.lesson.start_time)
+                                    e_end = st.text_input("Fine", target_shift.lesson.end_time)
+                                
+                                st.markdown("**Assegnazioni**")
+                                all_user_names = [u.name for u in st.session_state.users]
+                                
+                                # Current assigned
+                                cur_sbob = [u.name for u in target_shift.sbobinatori]
+                                cur_rev = [u.name for u in target_shift.revisori]
+                                
+                                new_sbob_names = st.multiselect("Sbobinatori", all_user_names, default=cur_sbob)
+                                new_rev_names = st.multiselect("Revisori", all_user_names, default=cur_rev)
+                                
+                                c_save, c_del = st.columns([4, 1])
+                                saved = c_save.form_submit_button("Salva Modifiche")
+                                
+                                if saved:
+                                    # Update Lesson
+                                    target_shift.lesson.date = e_date
+                                    target_shift.lesson.subject = e_subj
+                                    target_shift.lesson.start_time = e_start
+                                    target_shift.lesson.end_time = e_end
+                                    
+                                    # Update Users (Map names back to objects)
+                                    target_shift.sbobinatori = [u for u in st.session_state.users if u.name in new_sbob_names]
+                                    target_shift.revisori = [u for u in st.session_state.users if u.name in new_rev_names]
+                                    
+                                    if DataManager.save_shifts(st.session_state.shifts):
+                                        st.success("Modifiche Salvate!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Errore salvataggio")
+
+                            # Delete button check
+                            with st.expander("🗑️ Rimuovi questo turno"):
+                                if st.button("Elimina Turno", key=f"del_{target_shift.lesson.key}"):
+                                    st.session_state.shifts.remove(target_shift)
+                                    DataManager.save_shifts(st.session_state.shifts)
+                                    st.success("Cancellato!")
+                                    st.rerun()
+                    else:
+                        st.info("Nessun turno presente.")
         
         with ad_tab2:
             st.subheader("Gestione Utenti Avanzata")
@@ -305,7 +395,7 @@ else:
                     sbob_names = ", ".join([u.name for u in s.sbobinatori])
                     rev_names = ", ".join([u.name for u in s.revisori])
                     data.append({
-                        "Data": s.lesson.date,
+                        "Data": s.lesson.date.strftime('%d/%m/%Y'),
                         "Materia": s.lesson.subject,
                         "Orario": f"{s.lesson.start_time} ({s.lesson.duration_hours}h)",
                         "Sbobinatori": sbob_names,
@@ -341,7 +431,7 @@ else:
                     
                     shifts_data.append({
                         "Data": s.lesson.date, # Keep object for sorting
-                        "Giorno": s.lesson.date.strftime("%a %d/%m"),
+                        "Giorno": s.lesson.date.strftime('%d/%m/%Y'),
                         "Orario": f"{s.lesson.start_time}",
                         "Materia": s.lesson.subject,
                         "Assegnazioni": staff_str
@@ -426,7 +516,7 @@ else:
                         with st.container():
                             st.markdown(f"""
                             <div class="shift-card">
-                                <div class="shift-header">{s.lesson.date.strftime('%a %d %b')} | {s.lesson.start_time}</div>
+                                <div class="shift-header">{s.lesson.date.strftime('%d/%m/%Y')} | {s.lesson.start_time}</div>
                                 <div class="shift-header" style="color:#000;">{s.lesson.subject}</div>
                                 <div class="shift-sub">Ruolo: <b>{role_in_shift}</b> | Durata: {s.lesson.duration_hours}h</div>
                             </div>

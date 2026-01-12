@@ -105,8 +105,7 @@ class DataManager:
                 shifts_data = response.data
                 return [Shift.from_dict(s, all_users) for s in shifts_data]
             except Exception as e:
-                # If table doesn't exist or empty
-                print(f"Info loading shifts: {e}")
+                st.error(f"Errore caricamento Turni dal DB: {e}")
                 return []
         return []
 
@@ -115,19 +114,19 @@ class DataManager:
         sb = DataManager._get_supabase()
         if sb:
             try:
-                # We want to replace the current schedule with the new one.
-                # Simplest strategy: Delete * (all rows) then Insert new.
-                # Warning: ensuring we don't lose history if we want it, but user asked for "save state".
-                
-                # Delete all
-                sb.table("shifts").delete().neq("id", 0).execute() # Hack to delete all since id != 0
+                # Delete all (neq id 0 is a hack for 'all', assuming auto-increment ids are > 0)
+                # Ensure your table has 'id' column!
+                sb.table("shifts").delete().neq("id", 0).execute() 
                 
                 # Insert new
                 if shifts:
                     data = [s.to_dict() for s in shifts]
                     sb.table("shifts").insert(data).execute()
+                return True
             except Exception as e:
-                st.error(f"Errore salvataggio Turni: {e}")
+                st.error(f"Errore salvataggio Turni su DB: {e}")
+                return False
+        return False
 
 def parse_excel_schedule(file) -> List[Lesson]:
     try:
