@@ -20,9 +20,25 @@ class DataManager:
     def _get_supabase():
         """Returns Supabase client if secrets are set, else None."""
         try:
-            # Check if secrets exist
-            if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
-                return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+            url, key = None, None
+            
+            # 1. Try Top-Level (SUPABASE_URL)
+            if "SUPABASE_URL" in st.secrets:
+                url = st.secrets["SUPABASE_URL"]
+                key = st.secrets["SUPABASE_KEY"]
+            
+            # 2. Try Section (supabase.URL) - Standard Streamlit pattern
+            elif "supabase" in st.secrets:
+                if "URL" in st.secrets["supabase"]:
+                    url = st.secrets["supabase"]["URL"]
+                    key = st.secrets["supabase"]["KEY"]
+                elif "url" in st.secrets["supabase"]: # Lowercase check
+                    url = st.secrets["supabase"]["url"]
+                    key = st.secrets["supabase"]["key"]
+
+            if url and key:
+                return create_client(url, key)
+                
         except FileNotFoundError:
             pass # No secrets file
         except Exception as e:

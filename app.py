@@ -36,10 +36,7 @@ if 'supervision_subjects' not in st.session_state:
 # --- DB CONNECTION CHECK ---
 sb_status = DataManager._get_supabase()
 if not sb_status:
-    st.warning("⚠️ ATTENZIONE: Database non connesso! Assicurati di aver impostato i Secrets su Streamlit Cloud.")
-    # Debug info
-    if "SUPABASE_URL" not in st.secrets:
-         st.error("Secret 'SUPABASE_URL' mancante.")
+    st.warning("⚠️ ATTENZIONE: Database non connesso! Verifica i Secrets su Streamlit Cloud.")
     try:
         from supabase import create_client
     except ImportError:
